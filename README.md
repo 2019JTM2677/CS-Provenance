@@ -23,4 +23,4 @@ cvx_setup
 ```
 ### How to run the code:
 1. Install all the prerequisites that are mentioned above which is required to run the code
-2. Set parameters n= no. of nodes in the network, h= hop length of path required, m= no. of measurements (column size of sensing matrix), error threshold, no of pkts for simulation in SEE.m file and DEE.m for single and double edge embedding.
+2. Set parameters n= no. of nodes in the network, h= hop length of path required, m= no. of measurements (column size of sensing matrix), error threshold, no of pkts for simulation in SEE.m file for single edge embedding.
