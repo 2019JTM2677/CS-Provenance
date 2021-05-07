@@ -13,6 +13,7 @@
     pkt_path = [2 3 1 4 n];
     no_of_pkts = 10^4;          % No. of iterations
     error_threshold = 200;      % Error Rate = error_threshold/no_of_pkts
+    % Six values for column size 'm' starting at 2h
     start = 2*h;
     no_of_val = 6;
     inc = 3;  % Increment
@@ -223,7 +224,6 @@
                 S = 10;
                 alpha_0 = delta*(1-rho)/S;
                 %q = min((m(m_index)-h)/h,0.5);
-
                 [x_stOMP, iters] = SolveStOMP(Ar, y, E, 'FAR', alpha_0, S, 1);
                 %}
                 x_stOMP = StOMP(h,y,Ar);
@@ -427,14 +427,6 @@
                 x_gOMP_mod_v1(abs(x_gOMP_mod_v1)<=0.001)=0;
                 x_gOMP_mod_v1(abs(x_gOMP_mod_v1)>0.001)=1;
                 orig_x_gOMP_mod_v1 = x_gOMP_mod_v1;
-                
-                residual_norm=zeros(1,size(x_gOMP_mod_v1,2));
-                for j=1:size(x_gOMP_mod_v1,2)
-                    final_residue = y - Ar*x_gOMP_mod_v1(:,j);
-                    residual_norm(j) = norm(final_residue);
-                end
-                [~,order]= sort(residual_norm);
-                x_gOMP_mod_v1 = x_gOMP_mod_v1(:,order);
 
                 jj=[];              % Invalid path indices from set of solutions
                 for j=1:size(x_gOMP_mod_v1,2)
@@ -447,6 +439,15 @@
                 end
                 x_gOMP_mod_v1(:,jj)=[];
                 gOMP_te_module1(pkt_i) = toc(gOMP_ts_module1) ;
+                
+                % Arrage in ascending residual norm
+                residual_norm=zeros(1,size(x_gOMP_mod_v1,2));
+                for j=1:size(x_gOMP_mod_v1,2)
+                    final_residue = y - Ar*x_gOMP_mod_v1(:,j);
+                    residual_norm(j) = norm(final_residue);
+                end
+                [~,order]= sort(residual_norm);
+                x_gOMP_mod_v1 = x_gOMP_mod_v1(:,order);
 
                 if isempty(x_gOMP_mod_v1)
                     rec_x_gOMP_mod_v1 = zeros(E,1);
@@ -467,14 +468,6 @@
                 x_gOMP_mod_v2(abs(x_gOMP_mod_v2)<=0.001)=0;
                 x_gOMP_mod_v2(abs(x_gOMP_mod_v2)>0.001)=1;
                 orig_x_gOMP_mod_v2 = x_gOMP_mod_v2;
-                
-                residual_norm=zeros(1,size(x_gOMP_mod_v2,2));
-                for j=1:size(x_gOMP_mod_v2,2)
-                    final_residue = y - Ar*x_gOMP_mod_v2(:,j);
-                    residual_norm(j) = norm(final_residue);
-                end
-                [~,order]= sort(residual_norm);
-                x_gOMP_mod_v2 = x_gOMP_mod_v2(:,order);
 
                 jj=[];              % Invalid path indices from set of solutions
                 for j=1:size(x_gOMP_mod_v2,2)
@@ -487,6 +480,15 @@
                 end
                 x_gOMP_mod_v2(:,jj)=[];
                 gOMP_te_module2(pkt_i) = toc(gOMP_ts_module2) ;
+                
+                % Arrange in ascending residual norm
+                residual_norm=zeros(1,size(x_gOMP_mod_v2,2));
+                for j=1:size(x_gOMP_mod_v2,2)
+                    final_residue = y - Ar*x_gOMP_mod_v2(:,j);
+                    residual_norm(j) = norm(final_residue);
+                end
+                [~,order]= sort(residual_norm);
+                x_gOMP_mod_v2 = x_gOMP_mod_v2(:,order);
 
                 if isempty(x_gOMP_mod_v2)
                     rec_x_gOMP_mod_v2 = zeros(E,1);
@@ -667,15 +669,15 @@
         % DISPLAY Error rates
         fprintf("Error Rate:%f for column size %d\n",error_rate(m_index),m(m_index));
         fprintf("Error Rate:%f for column size %d OMP\n",error_rate_OMP(m_index),m(m_index));
-        fprintf("Error Rate:%f for column size %d PL OMP\n",error_rate_OMP_mod_v1(m_index),m(m_index));
-        fprintf("Error Rate:%f for column size %d L OMP\n",error_rate_OMP_mod_v2(m_index),m(m_index));
+        fprintf("Error Rate:%f for column size %d PL-OMP\n",error_rate_OMP_mod_v1(m_index),m(m_index));
+        fprintf("Error Rate:%f for column size %d L-OMP\n",error_rate_OMP_mod_v2(m_index),m(m_index));
         %fprintf("Error Rate:%f for column size %d mod OMP \n",error_rate_OMP_mod(m_index),m(m_index));
         %fprintf("Error Rate:%f for column size %d OMP topo\n",error_rate_OMP_topo(m_index),m(m_index));
         %fprintf("Error Rate:%f for column size %d list wo path\n",list_wo_path_rate(m_index),m(m_index));
       
         fprintf("Error Rate:%f for column size %d gOMP \n",error_rate_gOMP(m_index),m(m_index));
-        fprintf("Error Rate:%f for column size %d PL gOMP\n",error_rate_gOMP_mod_v1(m_index),m(m_index));
-        fprintf("Error Rate:%f for column size %d L gOMP\n",error_rate_gOMP_mod_v2(m_index),m(m_index));
+        fprintf("Error Rate:%f for column size %d PL-gOMP\n",error_rate_gOMP_mod_v1(m_index),m(m_index));
+        fprintf("Error Rate:%f for column size %d L-gOMP\n",error_rate_gOMP_mod_v2(m_index),m(m_index));
         %fprintf("Error Rate:%f for column size %d stomp\n",error_rate_stOMP(m_index),m(m_index));
         %fprintf("Error Rate:%f for column size %d cosamp\n",error_rate_cosamp(m_index),m(m_index));
 %}    
@@ -701,8 +703,8 @@
     axis([0 100 0 1]);
     grid on
     legend('CVX','OMP','PL-OMP','L-OMP','gOMP','PL-gOMP','L-gOMP');
-    title('Error rate vs number of rows edge embedding');
-    xlabel('Column size');
+    title('Error rate vs column size SE');
+    xlabel('Column size, m');
     ylabel('Error rate')
     hold off
     %}
