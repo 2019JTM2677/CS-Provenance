@@ -6,21 +6,21 @@
     clear;
     
     % Input Values
-    n = 5;                      % No. of nodes
+    n = 7;                      % No. of nodes
     hop_len = [1 2 3 4 5 6 7 8]; 
-    h = hop_len(4);             % Required path length
+    h = hop_len(6);             % Required path length
     topology = 'complete';      % Or 'random'
-    pkt_path = [2 3 1 4 n];
+    pkt_path = [2 5 6 3 1 4 n];
     no_of_pkts = 10^4;          % No. of iterations
     error_threshold = 200;      % Error Rate = error_threshold/no_of_pkts
     % Six values for column size 'm' starting at 2h
     start = 2*h;
     no_of_val = 6;
     inc = 3;  % Increment
-    stop = min((no_of_val -1)*inc + start,(n-1)^2);
+    stop = min((no_of_val -1)*inc + start,(n-1)^2);%m<E
     m = [start:inc:stop];       % Column size values using AP
-    N=2;                        % N for gOMP
-    L=N+1;                      % List size L-OMP
+    N = min(min(m)/h,h) ;       % N for gOMP 
+    L = N+1;                    % List size L-OMP
     
     % Run algorithm if value is set 1
     omp=1;
@@ -32,6 +32,8 @@
     PLomp=1;
     Lgomp=1;
     PLgomp=1;
+    % Save results in mat file if set to 1
+    save_result=0;
     
     %% %--------------------- Form Topology ------------------------------%
     
@@ -710,7 +712,9 @@
     %}
 %end
 
-infos ={'Results for SEE:(I)CVX (II)1. OMP 2. Modified OMP with path constraints (complete graph) in form of:a) adjacency matrix: DE to SE b)brute force 3. (2.a) with topology knowledge 4. gOMP & mod gOMP';
-   'n= no. of nodes';'h = path hop length/sparsity';'E= no. of possible edges';'m = column size of Ar for OMP';'graph_adj_mat = topology adjacency matrix';'Error rate for different cases'};
-
-%save SEE_n9_h8_fix.mat n E h graph_adj_mat path m error_rate error_rate_OMP error_rate_OMP_mod_v1 error_rate_OMP_mod_v2 error_rate_gOMP error_rate_gOMP_mod_v1 error_rate_gOMP_mod_v2 bad_fraction_overall OMP_t_module1 OMP_t_module2 gOMP_t_module1 gOMP_t_module2 cvx_t_module
+infos ={'Results for SEE:(I)CVX (II)1. OMP 2. PL-OMP 3. L-OMP (III)1. gOMP 2.PL-gOMP 3. L-gOMP';
+   'n= no. of nodes';'h = path hop length/sparsity';'E= no. of possible edges';
+   'm = column size of Ar for OMP';'graph_adj_mat = topology adjacency matrix'};
+if save_result
+   save SEE_n9_h8_fix.mat infos n E h graph_adj_mat path m error_rate error_rate_OMP error_rate_OMP_mod_v1 error_rate_OMP_mod_v2 error_rate_gOMP error_rate_gOMP_mod_v1 error_rate_gOMP_mod_v2 bad_fraction_overall OMP_t_module1 OMP_t_module2 gOMP_t_module1 gOMP_t_module2 cvx_t_module
+end

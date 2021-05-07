@@ -3,22 +3,35 @@
 % Functions used: node, path array de, double edge embed, OMP, OMP modified, 
 %DE to SE, DE valid path, packet
     clear;
-    n = 5; % no. of nodes
+    n = 7; % no. of nodes
     hop_len = [1 2 3 4 5 6 7 8]; % Required hop length
-    h = hop_len(4);
+    h = hop_len(6);
+    if rem(h+1,2)==0    
+        h_de = (h+1)/2 -1;  % Sparsity for double edge vector
+    else
+        h_de = floor((h+1)/2);
+    end
     topology = 'complete';      % Or 'random'
-    pkt_path = [2 3 1 4 n];
-    no_of_pkts = 10^4;          % No. of iterations
+    pkt_path = [2 3 1 5 6 4 n];
+    no_of_pkts = 10^3;          % No. of iterations
     error_threshold = 200;      % Error Rate = error_threshold/no_of_pkts
     % Six values for column size 'm'
     start = 2*h;
     no_of_val = 6;
-    inc = 3;  % Increment
-    stop = min((no_of_val -1)*inc + start,((n-2)^2)*(n-1));
-    m = [start:inc:stop];       % Column size values using AP
-    N=2;                        % N for gOMP
-    L=N+1;                      % List size L-OMP
+    inc = 4;  % Increment
+    stop = min((no_of_val -1)*inc + start,((n-2)^2)*(n-1)); %m<DE
+    m = [start:inc:stop];        % Column size values using AP
+    N = min(min(m)/h_de,h_de);   % N for gOMP
+    L = N+1;                     % List size L-OMP
     
+    % Run algorithm if value is set 1
+    omp=1;
+    gomp=1;
+    cvx=1;
+    Lomp=1;
+    Lgomp=1;
+    % Save results in mat file if set to 1
+    save_result=0;
     
     %% %--------------------- Form Topology -------------------------------%
     switch lower(topology)
@@ -151,29 +164,26 @@
             y = pkt.provenance;
             
 %-------------------- Recovery using OMP double edge ---------------------%
-            if rem(length(path),2)==0    
-                h_de = length(path)/2 -1;  % Sparsity for double edge vector
-            else
-                h_de = floor(length(path)/2);
-            end
-           
-            x_OMP = OMP(h_de,y,Ar);
-            
-            x_OMP(abs(x_OMP)<=0.001)=0;
-            x_OMP(abs(x_OMP)>0.001)=1;
-            
-            if ~isequal(x_OMP, Path_arr_de)
-               error_count_OMP = error_count_OMP +1; % Increment count
+            if omp
+                x_OMP = OMP(h_de,y,Ar);
+                x_OMP(abs(x_OMP)<=0.001)=0;
+                x_OMP(abs(x_OMP)>0.001)=1;
+
+                if ~isequal(x_OMP, Path_arr_de)
+                   error_count_OMP = error_count_OMP +1; % Increment count
+                end
             end
 %-------------------------------------------------------------------------%            
             
 %---------------------- Recovery using gOMP ------------------------------%
-            %N = 4;%floor(min(h_de,m(m_index)/h_de));
-            x_gOMP = gOMP(h_de,y,Ar,N);
-            x_gOMP(abs(x_gOMP)<=0.001)=0;
-            x_gOMP(abs(x_gOMP)>0.001)=1;
-            if ~isequal(x_gOMP, Path_arr_de)
-               error_count_gOMP = error_count_gOMP +1; % Increment count
+            if gomp
+                %N = 4;%floor(min(h_de,m(m_index)/h_de));
+                x_gOMP = gOMP(h_de,y,Ar,N);
+                x_gOMP(abs(x_gOMP)<=0.001)=0;
+                x_gOMP(abs(x_gOMP)>0.001)=1;
+                if ~isequal(x_gOMP, Path_arr_de)
+                   error_count_gOMP = error_count_gOMP +1; % Increment count
+                end
             end
 %-------------------------------------------------------------------------%            
             
@@ -230,50 +240,50 @@
                 A_2(i,j)=1;
             end
             
-            %L=N+1;
-            ts_module2 = tic;
-            x_OMP_mod_v2 = OMP_modified(h_de,y,Ar,L);
-            x_OMP_mod_v2(abs(x_OMP_mod_v2)<=0.001)=0;
-            x_OMP_mod_v2(abs(x_OMP_mod_v2)>0.001)=1;
-            
-            size_OMP_v2 = size(x_OMP_mod_v2,2);
-            
-            jj=[];
-            for j=1:size(x_OMP_mod_v2,2) 
-                x_n_sq = DE_to_SE(x_OMP_mod_v2(:,j),n,h,penultimate.Node_id,temp_a,temp_b,temp_c,temp_d,temp_e,A_1,A_2);
-                opt = Adjacency_constraint(x_n_sq,B,C,h,src.Node_id);
-                if opt==0
-                        jj=[jj j];
+            if Lomp
+                ts_module2 = tic;
+                x_OMP_mod_v2 = OMP_modified(h_de,y,Ar,L);
+                x_OMP_mod_v2(abs(x_OMP_mod_v2)<=0.001)=0;
+                x_OMP_mod_v2(abs(x_OMP_mod_v2)>0.001)=1;
+
+                size_OMP_v2 = size(x_OMP_mod_v2,2);
+
+                jj=[];
+                for j=1:size(x_OMP_mod_v2,2) 
+                    x_n_sq = DE_to_SE(x_OMP_mod_v2(:,j),n,h,penultimate.Node_id,temp_a,temp_b,temp_c,temp_d,temp_e,A_1,A_2);
+                    opt = Adjacency_constraint(x_n_sq,B,C,h,src.Node_id);
+                    if opt==0
+                            jj=[jj j];
+                    end
+                end
+                x_OMP_mod_v2(:,jj)=[];
+                te_module2(pkt_i) = toc(ts_module2) ;
+
+                %Arrange in ascending residual norm
+                residual_norm=zeros(1,size(x_OMP_mod_v2,2));
+                for j=1:size(x_OMP_mod_v2,2)
+                    final_residue = y - Ar*x_OMP_mod_v2(:,j);
+                    residual_norm(j) = norm(final_residue);
+                end
+                [~,order]= sort(residual_norm);
+                x_OMP_mod_v2 = x_OMP_mod_v2(:,order);
+
+                if isempty(x_OMP_mod_v2)
+                    rec_x_OMP_mod_v2 = zeros(DE,1);
+                else
+                    rec_x_OMP_mod_v2 = x_OMP_mod_v2(:,1);
+                end
+
+                if ~isequal(rec_x_OMP_mod_v2, Path_arr_de)
+                   error_count_OMP_mod_v2 = error_count_OMP_mod_v2 +1; % Increment count
+                   flag_v2=0;
+                   if ismember(Path_arr_de',x_OMP_mod_v2','rows')
+                        fprintf("RESIDUE BUG\n") 
+                   end
+                else
+                    flag_v2=1;
                 end
             end
-            x_OMP_mod_v2(:,jj)=[];
-            te_module2(pkt_i) = toc(ts_module2) ;
-            
-            %Arrange in ascending residual norm
-            residual_norm=zeros(1,size(x_OMP_mod_v2,2));
-            for j=1:size(x_OMP_mod_v2,2)
-                final_residue = y - Ar*x_OMP_mod_v2(:,j);
-                residual_norm(j) = norm(final_residue);
-            end
-            [~,order]= sort(residual_norm);
-            x_OMP_mod_v2 = x_OMP_mod_v2(:,order);
-            
-            if isempty(x_OMP_mod_v2)
-                rec_x_OMP_mod_v2 = zeros(DE,1);
-            else
-                rec_x_OMP_mod_v2 = x_OMP_mod_v2(:,1);
-            end
-
-            if ~isequal(rec_x_OMP_mod_v2, Path_arr_de)
-               error_count_OMP_mod_v2 = error_count_OMP_mod_v2 +1; % Increment count
-               flag_v2=0;
-               if ismember(Path_arr_de',x_OMP_mod_v2','rows')
-                    fprintf("RESIDUE BUG\n") 
-               end
-            else
-                flag_v2=1;
-            end
-            
 %--------------- verifying using brute force ------------------------------%
             %{
             ts_brute = tic;
@@ -324,45 +334,47 @@
 
 %-------------------------------------------------------------------------%
             %}
-%-------------------- Recovery using modified gOMP -----------------------%
-            %N = 4;%floor(min(h_de,m(m_index)/h_de));
-            x_gOMP_mod_v2 = gOMP_list_module2(h_de,y,Ar,N);%gOMP_modified(h_de,y,Ar,N);
-            
-            x_gOMP_mod_v2(abs(x_gOMP_mod_v2)<=0.001)=0;
-            x_gOMP_mod_v2(abs(x_gOMP_mod_v2)>0.001)=1;
-            orig_x_gOMP_mod=x_gOMP_mod_v2;
-            size_gOMP_v2 = size(x_gOMP_mod_v2,2);
-            
-            jj=[];              % Invalid path indices from set of solutions
-            for j=1:size(x_gOMP_mod_v2,2)
-                    x_n_sq = DE_to_SE(x_gOMP_mod_v2(:,j),n,h,penultimate.Node_id,temp_a,temp_b,temp_c,temp_d,temp_e,A_1,A_2);
-                    opt = Adjacency_constraint(x_n_sq,B,C,h,src.Node_id);
-                    if opt==0
-                        jj=[jj j];
-                    end
-            end
-            x_gOMP_mod_v2(:,jj)=[];
-            
-            % Arrange in ascending residual norm
-            residual_norm=zeros(1,size(x_gOMP_mod_v2,2));
-            for j=1:size(x_gOMP_mod_v2,2)
-                final_residue = y - Ar*x_gOMP_mod_v2(:,j);
-                residual_norm(j) = norm(final_residue);
-            end
-            [~,order]= sort(residual_norm);
-            x_gOMP_mod_v2 = x_gOMP_mod_v2(:,order);
-                
-            if isempty(x_gOMP_mod_v2)
-                rec_x_gOMP_mod_v2 = zeros(DE,1);%orig_x_gOMP_mod(:,1);
-            else
-                rec_x_gOMP_mod_v2 = x_gOMP_mod_v2(:,1);
-            end
-            
-            if ~isequal(rec_x_gOMP_mod_v2, Path_arr_de)
-               error_count_gOMP_mod_v2 = error_count_gOMP_mod_v2 +1; % Increment count
-               if ismember(Path_arr_de',orig_x_gOMP_mod','rows')
-                    fprintf("RESIDUE BUG\n") 
-               end
+%-------------------- Recovery using L-gOMP -----------------------%
+            if Lgomp
+                %N = 4;%floor(min(h_de,m(m_index)/h_de));
+                x_gOMP_mod_v2 = gOMP_list_module2(h_de,y,Ar,N);
+
+                x_gOMP_mod_v2(abs(x_gOMP_mod_v2)<=0.001)=0;
+                x_gOMP_mod_v2(abs(x_gOMP_mod_v2)>0.001)=1;
+                orig_x_gOMP_mod=x_gOMP_mod_v2;
+                size_gOMP_v2 = size(x_gOMP_mod_v2,2);
+
+                jj=[];              % Invalid path indices from set of solutions
+                for j=1:size(x_gOMP_mod_v2,2)
+                        x_n_sq = DE_to_SE(x_gOMP_mod_v2(:,j),n,h,penultimate.Node_id,temp_a,temp_b,temp_c,temp_d,temp_e,A_1,A_2);
+                        opt = Adjacency_constraint(x_n_sq,B,C,h,src.Node_id);
+                        if opt==0
+                            jj=[jj j];
+                        end
+                end
+                x_gOMP_mod_v2(:,jj)=[];
+
+                % Arrange in ascending residual norm
+                residual_norm=zeros(1,size(x_gOMP_mod_v2,2));
+                for j=1:size(x_gOMP_mod_v2,2)
+                    final_residue = y - Ar*x_gOMP_mod_v2(:,j);
+                    residual_norm(j) = norm(final_residue);
+                end
+                [~,order]= sort(residual_norm);
+                x_gOMP_mod_v2 = x_gOMP_mod_v2(:,order);
+
+                if isempty(x_gOMP_mod_v2)
+                    rec_x_gOMP_mod_v2 = zeros(DE,1);%orig_x_gOMP_mod(:,1);
+                else
+                    rec_x_gOMP_mod_v2 = x_gOMP_mod_v2(:,1);
+                end
+
+                if ~isequal(rec_x_gOMP_mod_v2, Path_arr_de)
+                   error_count_gOMP_mod_v2 = error_count_gOMP_mod_v2 +1; % Increment count
+                   if ismember(Path_arr_de',orig_x_gOMP_mod','rows')
+                        fprintf("RESIDUE BUG\n") 
+                   end
+                end
             end
 %-------------------------------------------------------------------------%            
             %}
@@ -446,22 +458,23 @@
 %------------------- Recovery using CVX double edge ----------------------%
             
             %x_de = cvx_solver(DE,b_de,Ar_de);
-            %
-            cvx_begin quiet
-                cvx_precision default
-                variable x_de(DE) %binary
-                minimize( norm(x_de, 1 ) )
-                subject to
-                    Ar*x_de == y;
-            cvx_end
-            
-            x_de(abs(x_de)<=0.001)=0;
-            x_de(abs(x_de)>0.001)=1;
+            if cvx
+                cvx_begin quiet
+                    cvx_precision default
+                    variable x_de(DE) %binary
+                    minimize( norm(x_de, 1 ) )
+                    subject to
+                        Ar*x_de == y;
+                cvx_end
 
-            if ~isequal(x_de,Path_arr_de)
-                error_count = error_count +1; %Increment if path recovered is different from path travelled
-            end
-            %}
+                x_de(abs(x_de)<=0.001)=0;
+                x_de(abs(x_de)>0.001)=1;
+
+                if ~isequal(x_de,Path_arr_de)
+                    error_count = error_count +1; %Increment if path recovered is different from path travelled
+                end
+            end    
+          
 %-------------------------------------------------------------------------%
             % HALT CONDITION
             if error_count_gOMP_mod_v2 == error_threshold
@@ -481,7 +494,7 @@
         
         % List size
         %fprintf("size list OMP module 1:");display(size(x_OMP_mod_v1));
-        fprintf("size list L-OMP:%d\n",size_OMP_v2);
+        fprintf("\nsize list L-OMP:%d\n",size_OMP_v2);
         fprintf("size list L-gOMP:%d\n",size_gOMP_v2);        %{
         
         %}
@@ -527,8 +540,9 @@
     hold off
 %end
 %}
-infos ={'Results for DEE: (I) CVX (II)1. OMP 2. Modified OMP with path constraints (complete graph) in form of:a) adjacency matrix: DE to SE b)brute force 3. (2.a) with topology knowledge';
-    'n= no. of nodes';'h = path hop length';'DE= no. of possible double edges';'m = column size of Ar for OMP';'graph_adj_mat = topology adjacency matrix';'Error rate for different cases'};
-%filename = 'DEE_omp.mat';
-%save DEE_cvx_omp_gomp.mat infos n DE h graph_adj_mat path m error_rate_de error_rate_Ode error_rate_OMP_mod_adj error_rate_OMP_mod error_rate_OMP_topo error_rate_gOMP error_rate_gOMP_mod
-%save DEE_n9_h8.mat n DE h graph_adj_mat path m N error_rate_OMP error_rate_OMP_mod_v2 error_rate_gOMP error_rate_gOMP_mod
+infos ={'Results for SEE:(I)CVX (II)1. OMP 2. L-OMP (III)1. gOMP 2. L-gOMP';
+   'n= no. of nodes';'h = path hop length';'h_de = DE sparsity';'DE= no. of possible double edges';
+   'm = column size of Ar for OMP';'graph_adj_mat = topology adjacency matrix'};
+if save_result
+   save DEE_n9_h8.mat infos n DE h h_de graph_adj_mat path m N error_rate error_rate_OMP error_rate_OMP_mod_v2 error_rate_gOMP error_rate_gOMP_mod_v2
+end
