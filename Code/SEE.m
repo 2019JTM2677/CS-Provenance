@@ -10,13 +10,13 @@
     hop_len = [1 2 3 4 5 6 7 8]; 
     h = hop_len(6);             % Required path length
     topology = 'complete';      % Or 'random'
-    pkt_path = [2 5 6 3 1 4 n];
-    no_of_pkts = 10^4;          % No. of iterations
-    error_threshold = 200;      % Error Rate = error_threshold/no_of_pkts
+    pkt_path = [1 3 2 4 5 6 n];
+    no_of_pkts = 10^3;          % No. of iterations
+    error_threshold = 100;      % Error Rate = error_threshold/no_of_pkts
     % Six values for column size 'm' starting at 2h
     start = 2*h;
     no_of_val = 6;
-    inc = 3;  % Increment
+    inc = 4;  % Increment
     stop = min((no_of_val -1)*inc + start,(n-1)^2);%m<E
     m = [start:inc:stop];       % Column size values using AP
     N = min(min(m)/h,h) ;       % N for gOMP 
@@ -30,6 +30,7 @@
     cvx=1;
     Lomp=1;
     PLomp=1;
+    PLomp2=1;
     Lgomp=1;
     PLgomp=1;
     % Save results in mat file if set to 1
@@ -97,6 +98,44 @@
     
     mu=0;sigma=1;          % gaussian parameters
     
+    % verifying using adjacency, convert (n-1)^2 -> n^2
+    B=[];
+    for ii=1:n
+        count=0;
+        for j=1:EE
+            k=n*(ii-1)+1;
+            count=k+n;
+            if j>=k && j<count 
+                B(ii,j)=1;
+            else 
+                B(ii,j)=0;
+            end
+        end
+    end
+    C=[];
+    for ii=1:n
+        C=[C;eye(n)];
+    end
+
+    % Extra indices in n^2 vector
+    temp_e=zeros(1,n);
+    temp_f=zeros(1,n-1);
+    temp_g=zeros(1,n-1);
+
+    for i=1:n
+        temp_e(i)=(i-1)*n + i;
+    end
+
+    for i=1:n-1
+        temp_f(i)=i*n;
+        temp_g(i)= n*(n-1)+i;
+    end
+
+    temp_dest=zeros(1,n-1); % indices mapped to i->dest
+    for i=1:(n-1)
+        temp_dest(i)=i*(n-1);
+    end
+    
     %{
     temp_m = 2*h; 
     m=[]; % form array for various values of no of rows of matrix Ar(m,n) 
@@ -125,7 +164,7 @@
     
     error_rate = zeros(1,length(m));            % CVX
     error_rate_OMP = zeros(1,length(m));        % OMP
-    error_rate_OMP_mod_v1=zeros(1,length(m));   % PL-OMP(in-built path constraints)
+    error_rate_OMP_mod_v1=zeros(1,length(m));   % PL-OMP one missing link(in-built path constraints)
     error_rate_OMP_mod_v2 = zeros(1,length(m)); % L-OMP(path constraints after solution)
     error_rate_OMP_mod = zeros(1,length(m));    % L-OMP  with brute force
     error_rate_OMP_topo = zeros(1,length(m));   % L-OMP with topology knowledge
@@ -135,11 +174,13 @@
     error_rate_cosamp=zeros(1,length(m));       % CoSaMP
     error_rate_stOMP=zeros(1,length(m));        % StOMP
     list_wo_path_rate=zeros(1,length(m));       % OMP solution list have no valid paths
+    error_rate_PLOMP2=zeros(1,length(m));       % PL-OMP with two missing link
     
     for m_index =1: length(m)
         error_count = 0;    
         error_count_OMP = 0;  
         error_count_OMP_mod_v1 = 0;
+        error_count_PLOMP2=0;
         error_count_OMP_mod_v2 = 0;
         error_count_OMP_mod = 0; 
         error_count_OMP_topo = 0;
@@ -161,6 +202,7 @@
         error_rate_gOMP_mod_v2(m_index)=0;
         error_rate_cosamp(m_index)=0;
         error_rate_stOMP(m_index)=0;
+        error_rate_PLOMP2(m_index)=0;
         list_wo_path_rate(m_index)=0;
         
         pkt_count = 0;
@@ -255,44 +297,6 @@
 %------------------- Recovery using OMP module 2-------------------------%
             %N=2;%floor(min(h,m(m_index)/h));
             %L=N+1;
-
-            % verifying using adjacency, convert (n-1)^2 -> n^2
-            B=[];
-            for ii=1:n
-                count=0;
-                for j=1:EE
-                    k=n*(ii-1)+1;
-                    count=k+n;
-                    if j>=k && j<count 
-                        B(ii,j)=1;
-                    else 
-                        B(ii,j)=0;
-                    end
-                end
-            end
-            C=[];
-            for ii=1:n
-                C=[C;eye(n)];
-            end
-
-            % Extra indices in n^2 vector
-            temp_e=zeros(1,n);
-            temp_f=zeros(1,n-1);
-            temp_g=zeros(1,n-1);
-
-            for i=1:n
-                temp_e(i)=(i-1)*n + i;
-            end
-
-            for i=1:n-1
-                temp_f(i)=i*n;
-                temp_g(i)= n*(n-1)+i;
-            end
-
-            temp_dest=zeros(1,n-1); % indices mapped to i->dest
-            for i=1:(n-1)
-                temp_dest(i)=i*(n-1);
-            end
             
             if Lomp
                 OMP_ts_module2 = tic;       % Time elapse check
@@ -398,7 +402,7 @@
             %}
 %-------------------------------------------------------------------------%    
 
-%------------------ Recovery using modified OMP module 1 -----------------%
+%------------ Recovery using modified OMP module 1 (PL-OMP one missing link)----------%
             if PLomp
                 OMP_ts_module1 = tic;
                 x_OMP_mod_v1 = module_1(n,h,y,Ar,L,B,C,temp_e,temp_f,temp_g,temp_dest,src.Node_id,dest.Node_id,'SE');
@@ -412,8 +416,32 @@
 
                 if ~isequal(rec_x_OMP_mod_v1, Path_arr)
                     error_count_OMP_mod_v1 = error_count_OMP_mod_v1 +1; % Increment count
+                    flag=0;
+                else
+                    flag=1; % Correct result
                 end 
                 size_v1=size(x_OMP_mod_v1,2);
+            end
+%-------------------------------------------------------------------------%
+%------------------ Recovery using PL-OMP & two missing link -----------------%
+            if PLomp2
+                ts_PLomp2 = tic;
+                x_PLomp2 = PL_OMP2(n,h,y,Ar,L,B,C,temp_e,temp_f,temp_g,temp_dest,src.Node_id,dest.Node_id,'SE');
+                te_PLomp2(pkt_i) = toc(ts_PLomp2) ;
+
+                if isempty(x_PLomp2)
+                    rec_x_PLomp2 = zeros(E,1);
+                else
+                    rec_x_PLomp2 = x_PLomp2(:,1);
+                end
+
+                if ~isequal(rec_x_PLomp2, Path_arr)
+                    error_count_PLOMP2 = error_count_PLOMP2 +1; % Increment count
+                    if flag==1
+                        fprintf("BUG here\n")
+                    end
+                end 
+                size_PLomp2=size(x_PLomp2,2);
             end
 %-------------------------------------------------------------------------%
             
@@ -422,7 +450,7 @@
             
             %N = 2;%floor(min(h,m(m_index)/h));
 
-%-------------------------------- PL-gOMP --------------------------------%
+%-------------------- PL-gOMP with one missing link ----------------------%
             if PLgomp
                 gOMP_ts_module1 = tic;
                 [x_gOMP_mod_v1,bad_fraction(pkt_i)] = gOMP_list_module1(h,y,Ar,N,n,temp_e,temp_f,temp_g,temp_dest,B,C,src.Node_id);   
@@ -606,11 +634,11 @@
                 x = zeros(E,1);
                 cvx_ts_module = tic;
                 cvx_begin quiet
-                    cvx_precision default
-                    variable x(E) %binary  %change
-                    minimize( norm(x, 1 ) )
-                    subject to
-                        Ar*x == y;
+                cvx_precision default
+                variable x(E) %binary  
+                minimize( norm(x, 1 ) )
+                subject to
+                    Ar*x == y;
 
                 cvx_end
 
@@ -632,11 +660,24 @@
         end
         
         % Time 
-        OMP_t_module1(m_index) = mean(OMP_te_module1);
-        OMP_t_module2(m_index) = mean(OMP_te_module2);
-        gOMP_t_module1(m_index) = mean(gOMP_te_module1);
-        gOMP_t_module2(m_index) = mean(gOMP_te_module2);
-        cvx_t_module(m_index) = mean(cvx_te_module);
+        if PLomp
+            OMP_t_module1(m_index) = mean(OMP_te_module1);
+        end
+        if PLomp2
+            t_PLomp2(m_index) = mean(te_PLomp2);
+        end
+        if Lomp
+            OMP_t_module2(m_index) = mean(OMP_te_module2);
+        end
+        if PLgomp
+            gOMP_t_module1(m_index) = mean(gOMP_te_module1);
+        end
+        if Lgomp
+            gOMP_t_module2(m_index) = mean(gOMP_te_module2);
+        end
+        if cvx
+            cvx_t_module(m_index) = mean(cvx_te_module);
+        end
         %t_module3(m_index) = mean(te_module3);
         %t_Brute(m_index) = mean(te_brute);
         %fprintf("Time complexity:") ;
@@ -650,7 +691,7 @@
         %fprintf("size L-omp list:");display(size_v2);
         
         %}
-        bad_fraction_overall(m_index) = mean(bad_fraction); 
+        %bad_fraction_overall(m_index) = mean(bad_fraction); 
         %fprintf("Fraction of bad solutions in gOMP module 1:")
         %display(bad_fraction_overall);
         %list_wo_path_rate(m_index)= list_wo_path_count/pkt_count;
@@ -658,6 +699,7 @@
         error_rate(m_index) = error_count/pkt_count;
         error_rate_OMP(m_index) = error_count_OMP/pkt_count;
         error_rate_OMP_mod_v1(m_index) = error_count_OMP_mod_v1/pkt_count;
+        error_rate_PLOMP2(m_index)=  error_count_PLOMP2/pkt_count;
         error_rate_OMP_mod_v2(m_index) =  error_count_OMP_mod_v2/pkt_count;
         %error_rate_OMP_topo(m_index) = error_count_OMP_topo/pkt_count;
         %error_rate_OMP_mod(m_index) =  error_count_OMP_mod/pkt_count;
@@ -669,17 +711,18 @@
         %error_rate_cosamp(m_index) = error_count_cosamp/pkt_count;
         %}
         % DISPLAY Error rates
-        fprintf("Error Rate:%f for column size %d\n",error_rate(m_index),m(m_index));
-        fprintf("Error Rate:%f for column size %d OMP\n",error_rate_OMP(m_index),m(m_index));
+        %fprintf("Error Rate:%f for column size %d\n",error_rate(m_index),m(m_index));
+        %fprintf("Error Rate:%f for column size %d OMP\n",error_rate_OMP(m_index),m(m_index));
         fprintf("Error Rate:%f for column size %d PL-OMP\n",error_rate_OMP_mod_v1(m_index),m(m_index));
+        fprintf("Error Rate:%f for column size %d PL-OMP 2\n",error_rate_PLOMP2(m_index),m(m_index));
         fprintf("Error Rate:%f for column size %d L-OMP\n",error_rate_OMP_mod_v2(m_index),m(m_index));
         %fprintf("Error Rate:%f for column size %d mod OMP \n",error_rate_OMP_mod(m_index),m(m_index));
         %fprintf("Error Rate:%f for column size %d OMP topo\n",error_rate_OMP_topo(m_index),m(m_index));
         %fprintf("Error Rate:%f for column size %d list wo path\n",list_wo_path_rate(m_index),m(m_index));
       
-        fprintf("Error Rate:%f for column size %d gOMP \n",error_rate_gOMP(m_index),m(m_index));
-        fprintf("Error Rate:%f for column size %d PL-gOMP\n",error_rate_gOMP_mod_v1(m_index),m(m_index));
-        fprintf("Error Rate:%f for column size %d L-gOMP\n",error_rate_gOMP_mod_v2(m_index),m(m_index));
+        %fprintf("Error Rate:%f for column size %d gOMP \n",error_rate_gOMP(m_index),m(m_index));
+        %fprintf("Error Rate:%f for column size %d PL-gOMP\n",error_rate_gOMP_mod_v1(m_index),m(m_index));
+        %fprintf("Error Rate:%f for column size %d L-gOMP\n",error_rate_gOMP_mod_v2(m_index),m(m_index));
         %fprintf("Error Rate:%f for column size %d stomp\n",error_rate_stOMP(m_index),m(m_index));
         %fprintf("Error Rate:%f for column size %d cosamp\n",error_rate_cosamp(m_index),m(m_index));
 %}    
