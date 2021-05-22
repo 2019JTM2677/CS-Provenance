@@ -5,30 +5,32 @@
     clear;
     n = 7; % no. of nodes
     hop_len = [1 2 3 4 5 6 7 8]; % Required hop length
-    h = hop_len(6);
+    h = hop_len(5);
     if rem(h+1,2)==0    
         h_de = (h+1)/2 -1;  % Sparsity for double edge vector
     else
         h_de = floor((h+1)/2);
     end
     topology = 'complete';      % Or 'random'
-    pkt_path = [2 3 1 5 6 4 n];
-    no_of_pkts = 10^3;          % No. of iterations
+    pkt_path = [2 3 4 1 5 n];
+    no_of_pkts = 10^6;          % No. of iterations
     error_threshold = 200;      % Error Rate = error_threshold/no_of_pkts
     % Six values for column size 'm'
-    start = 2*h;
-    no_of_val = 6;
-    inc = 4;  % Increment
+    start = 2*h_de;
+    no_of_val = 8;
+    inc = 5;  % Increment
     stop = min((no_of_val -1)*inc + start,((n-2)^2)*(n-1)); %m<DE
     m = [start:inc:stop];        % Column size values using AP
     N = min(min(m)/h_de,h_de);   % N for gOMP
     L = N+1;                     % List size L-OMP
+    m=[45 50];
     
     % Run algorithm if value is set 1
-    omp=1;
-    gomp=1;
-    cvx=1;
+    omp=0;
+    gomp=0;
+    cvx=0;
     Lomp=1;
+    PLomp=0;
     Lgomp=1;
     % Save results in mat file if set to 1
     save_result=0;
@@ -90,7 +92,57 @@
     EE = n^2; 
     
     mu = 0; sigma = 1;  % gaussian parameters
+    
+    B=[];
+    for ii=1:n
+        count=0;
+        for j=1:EE
+            k=n*(ii-1)+1;
+            count=k+n;
+            if j>=k && j<count 
+                B(ii,j)=1;
+            else 
+                B(ii,j)=0;
+            end
+        end
+    end
+    C=[];
+    for ii=1:n
+        C=[C;eye(n)];
+    end
 
+    temp_a=zeros(1,n^2);temp_b=zeros(1,n^2);
+    temp_c=zeros(1,n^2);temp_d=zeros(1,n^2);
+    ii=0;
+    for j=1:n
+        for i=1:n
+            ii=ii+1;
+            temp_a(ii)= n^2*(j-1)+ n*(j-1)+i;
+            temp_b(ii)= n^2*j -i + 1;
+            temp_c(ii)= n^2*(j-1)+ j + n*(i-1);
+            temp_d(ii)= n^2*(j-1)+ (n+1)*(i-1)+1;
+
+        end
+    end
+    temp_e = n^2*(n-1)+(1:n^2);
+    A_1=zeros(n^2,n^3); %a->b->i
+    A_2=zeros(n^2,n^3); %i->a->b
+
+    for i=1:n^2
+        j=(1:n)+n*(i-1);
+        A_1(i,j)=1;
+    end
+
+    for i=1:n^2
+        g=ceil(i/n);
+        k= mod(i,n);
+        if k==0
+            k=n;
+        end
+        j=g+(0:n-1)*n+(n^2*(k-1));
+        A_2(i,j)=1;
+    end
+            
     % Define n nodes
     nodes_de=[];  % All varE used for additional constraint
     for i= 1:n
@@ -189,6 +241,7 @@
             
 
 %---------------------- Recovery using modified OMP module 2 -------------%
+            %{
             % Verifying using adajacency matrix
             B=[];
             for ii=1:n
@@ -239,9 +292,10 @@
                 j=g+(0:n-1)*n+(n^2*(k-1));
                 A_2(i,j)=1;
             end
-            
+            %}
             if Lomp
-                ts_module2 = tic;
+               
+                OMP_ts_module2 = tic;
                 x_OMP_mod_v2 = OMP_modified(h_de,y,Ar,L);
                 x_OMP_mod_v2(abs(x_OMP_mod_v2)<=0.001)=0;
                 x_OMP_mod_v2(abs(x_OMP_mod_v2)>0.001)=1;
@@ -257,7 +311,7 @@
                     end
                 end
                 x_OMP_mod_v2(:,jj)=[];
-                te_module2(pkt_i) = toc(ts_module2) ;
+                OMP_te_module2(pkt_i) = toc(OMP_ts_module2);
 
                 %Arrange in ascending residual norm
                 residual_norm=zeros(1,size(x_OMP_mod_v2,2));
@@ -314,24 +368,27 @@
             %}
 %-------------------------------------------------------------------------%
 
-            %{
+            %
 %----------------------- modified OMP module 1 ---------------------------%
-            ts_module1 = tic;
-            x_OMP_mod_v1 = de_OMP_module_1(n,h_de,h,y,Ar,L,B,C,A_1,A_2,temp_a,...
-            temp_b,temp_c,temp_d,temp_e,src.Node_id,dest.Node_id,penultimate.Node_id);    
-            te_module1(pkt_i) = toc(ts_module1) ;
+            if PLomp
+                
+                OMP_ts_module1 = tic;
+                x_OMP_mod_v1 = PL_OMP_DE(n,h_de,h,y,Ar,L,B,C,A_1,A_2,temp_a,...
+                temp_b,temp_c,temp_d,temp_e,src.Node_id,dest.Node_id,penultimate.Node_id);    
+                OMP_te_module1(pkt_i) = toc(OMP_ts_module1);
 
-            size_OMP_v1 = size(x_OMP_mod_v1,2);
-            if isempty(x_OMP_mod_v1)
-                rec_x_OMP_mod_v1 = zeros(DE,1);
-            else
-                rec_x_OMP_mod_v1 = x_OMP_mod_v1(:,1);
-            end
-            
-            if ~isequal(rec_x_OMP_mod_v1, Path_arr_de)
-                error_count_OMP_mod_v1 = error_count_OMP_mod_v1 +1; % Increment count
-            end
+                size_OMP_v1 = size(x_OMP_mod_v1,2);
+                
+                if isempty(x_OMP_mod_v1)
+                    rec_x_OMP_mod_v1 = zeros(DE,1);
+                else
+                    rec_x_OMP_mod_v1 = x_OMP_mod_v1(:,1);
+                end
 
+                if ~isequal(rec_x_OMP_mod_v1, Path_arr_de)
+                    error_count_OMP_mod_v1 = error_count_OMP_mod_v1 +1; % Increment count
+                end
+            end
 %-------------------------------------------------------------------------%
             %}
 %-------------------- Recovery using L-gOMP -----------------------%
@@ -459,16 +516,18 @@
             
             %x_de = cvx_solver(DE,b_de,Ar_de);
             if cvx
+                cvx_ts_module = tic;
                 cvx_begin quiet
-                    cvx_precision default
-                    variable x_de(DE) %binary
-                    minimize( norm(x_de, 1 ) )
-                    subject to
-                        Ar*x_de == y;
+                cvx_precision default
+                variable x_de(DE) %binary
+                minimize( norm(x_de, 1 ) )
+                subject to
+                    Ar*x_de == y;
                 cvx_end
 
                 x_de(abs(x_de)<=0.001)=0;
                 x_de(abs(x_de)>0.001)=1;
+                cvx_te_module(pkt_i) = toc(cvx_ts_module) ;
 
                 if ~isequal(x_de,Path_arr_de)
                     error_count = error_count +1; %Increment if path recovered is different from path travelled
@@ -485,37 +544,36 @@
         
         % Time
         %{
-        t_module1(m_index) = mean(te_module1);
-        t_module2(m_index) = mean(te_module2);  % L-OMP
+        OMP_t_module1(m_index) = mean(OMP_te_module1);
+        OMP_t_module2(m_index) = mean(OMP_te_module2);
+        cvx_t_module(m_index) = mean(cvx_te_module);
         fprintf("Time complexity:") ;
-        display(t_module1);
-        display(t_module2);
+        display(OMP_t_module1);
+        display(OMP_t_module2);
         %}
         
         % List size
         %fprintf("size list OMP module 1:");display(size(x_OMP_mod_v1));
-        fprintf("\nsize list L-OMP:%d\n",size_OMP_v2);
-        fprintf("size list L-gOMP:%d\n",size_gOMP_v2);        %{
-        
-        %}
+        %fprintf("\nsize list L-OMP:%d\n",size_OMP_v2);
+        %fprintf("size list L-gOMP:%d\n",size_gOMP_v2);       
         
         error_rate(m_index) = error_count/pkt_count;
         error_rate_OMP(m_index) = error_count_OMP/pkt_count;
-        %error_rate_OMP_mod_v1(m_index) = error_count_OMP_mod_v1/pkt_count;
+        error_rate_OMP_mod_v1(m_index) = error_count_OMP_mod_v1/pkt_count;
         error_rate_OMP_mod_v2(m_index) =  error_count_OMP_mod_v2/pkt_count;
         %error_rate_OMP_mod(m_index) =  error_count_OMP_mod/pkt_count;
         %error_rate_OMP_topo(m_index) = error_count_OMP_topo/pkt_count;
         error_rate_gOMP(m_index) =  error_count_gOMP/pkt_count;
         error_rate_gOMP_mod_v2(m_index) =  error_count_gOMP_mod_v2/pkt_count;
         
-        fprintf("Error Rate:%f for column size %d\n",error_rate(m_index),m(m_index));
-        fprintf("Error Rate:%f for column size OMP %d\n",error_rate_OMP(m_index),m(m_index));
+        %fprintf("Error Rate:%f for column size %d\n",error_rate(m_index),m(m_index));
+        %fprintf("Error Rate:%f for column size OMP %d\n",error_rate_OMP(m_index),m(m_index));
         %fprintf("Error Rate:%f for column size PL-OMP %d\n",error_rate_OMP_mod_v1(m_index),m(m_index));
         fprintf("Error Rate:%f for column size L-OMP %d\n",error_rate_OMP_mod_v2(m_index),m(m_index));
         %fprintf("Error Rate:%f for column size mod OMP %d\n",error_rate_OMP_mod(m_index),m(m_index));
         %fprintf("Error Rate:%f for column size OMP topo %d\n",error_rate_OMP_topo(m_index),m(m_index));
-        fprintf("Error Rate:%f for column size gOMP  %d\n",error_rate_gOMP(m_index),m(m_index));
-        fprintf("Error Rate:%f for column size L-gOMP %d\n",error_rate_gOMP_mod_v2(m_index),m(m_index));
+        %fprintf("Error Rate:%f for column size gOMP  %d\n",error_rate_gOMP(m_index),m(m_index));
+        fprintf("Error Rate:%f for column size L-gOMP %d\n\n",error_rate_gOMP_mod_v2(m_index),m(m_index));
         
     end
     % end
@@ -526,7 +584,7 @@
     semilogy(m,error_rate, 'yo-', 'LineWidth', 1.5);
     hold on
     semilogy(m,error_rate_OMP, 'b+-', 'LineWidth', 1.5);
-    %semilogy(m,error_rate_OMP_mod_v1, 'g+-', 'LineWidth', 1.5);
+    semilogy(m,error_rate_OMP_mod_v1, 'ms-', 'LineWidth', 1.5);
     semilogy(m,error_rate_OMP_mod_v2, 'gs-', 'LineWidth', 1.5);
     %semilogy(m,error_rate_OMP_topo, 'r+-', 'LineWidth', 1.5);
     semilogy(m,error_rate_gOMP, 'm+-', 'LineWidth', 1.5);
@@ -535,8 +593,8 @@
     grid on
     legend('CVX','OMP','L-OMP','gOMP','L-gOMP');
     title('Error rate vs column size DE');
-    xlabel('Column size, m');
-    ylabel('Reconstruction Error rate');
+    xlabel('Column size');
+    ylabel('Error rate');
     hold off
 %end
 %}
