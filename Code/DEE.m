@@ -23,14 +23,13 @@
     m = [start:inc:stop];        % Column size values using AP
     N = min(min(m)/h_de,h_de);   % N for gOMP
     L = N+1;                     % List size L-OMP
-    m=[45 50];
     
     % Run algorithm if value is set 1
-    omp=0;
-    gomp=0;
-    cvx=0;
+    omp=1;
+    gomp=1;
+    cvx=1;
     Lomp=1;
-    PLomp=0;
+    PLomp=1;
     Lgomp=1;
     % Save results in mat file if set to 1
     save_result=0;
