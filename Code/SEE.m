@@ -6,17 +6,17 @@
     clear;
     
     % Input Values
-    n = 7;                      % No. of nodes
+    n = 4;                      % No. of nodes
     hop_len = [1 2 3 4 5 6 7 8]; 
-    h = hop_len(6);             % Required path length
+    h = hop_len(3);             % Required path length
     topology = 'complete';      % Or 'random'
-    pkt_path = [1 3 2 4 5 6 n];
-    no_of_pkts = 10^3;          % No. of iterations
+    pkt_path = [1 2 3 n];
+    no_of_pkts = 10^0;          % No. of iterations
     error_threshold = 100;      % Error Rate = error_threshold/no_of_pkts
     % Six values for column size 'm' starting at 2h
     start = 2*h;
-    no_of_val = 6;
-    inc = 4;  % Increment
+    no_of_val = 2;
+    inc = 2;  % Increment
     stop = min((no_of_val -1)*inc + start,(n-1)^2);%m<E
     m = [start:inc:stop];       % Column size values using AP
     N = min(min(m)/h,h) ;       % N for gOMP 
@@ -24,15 +24,15 @@
     
     % Run algorithm if value is set 1
     omp=1;
-    gomp=1;
+    gomp=0;
     stomp=0;
     cosamp=0;
-    cvx=1;
+    cvx=0;
     Lomp=1;
-    PLomp=1;
-    PLomp2=1;
-    Lgomp=1;
-    PLgomp=1;
+    PLomp=0;
+    PLomp2=0;
+    Lgomp=0;
+    PLgomp=0;
     % Save results in mat file if set to 1
     save_result=0;
     
@@ -99,6 +99,7 @@
     mu=0;sigma=1;          % gaussian parameters
     
     % verifying using adjacency, convert (n-1)^2 -> n^2
+    %{
     B=[];
     for ii=1:n
         count=0;
@@ -112,11 +113,15 @@
             end
         end
     end
+    %}
+    B=kron(eye(n),ones(1,n));
+    %{
     C=[];
     for ii=1:n
         C=[C;eye(n)];
     end
-
+    %}
+    C=kron(ones(n,1),eye(n));
     % Extra indices in n^2 vector
     temp_e=zeros(1,n);
     temp_f=zeros(1,n-1);
