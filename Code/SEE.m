@@ -11,12 +11,12 @@
     h = hop_len(3);             % Required path length
     topology = 'complete';      % Or 'random'
     pkt_path = [1 2 3 n];
-    no_of_pkts = 10^0;          % No. of iterations
+    no_of_pkts = 10^4;          % No. of iterations
     error_threshold = 100;      % Error Rate = error_threshold/no_of_pkts
     % Six values for column size 'm' starting at 2h
     start = 2*h;
-    no_of_val = 2;
-    inc = 2;  % Increment
+    no_of_val = 6;
+    inc = 3;  % Increment
     stop = min((no_of_val -1)*inc + start,(n-1)^2);%m<E
     m = [start:inc:stop];       % Column size values using AP
     N = min(min(m)/h,h) ;       % N for gOMP 
@@ -24,15 +24,15 @@
     
     % Run algorithm if value is set 1
     omp=1;
-    gomp=0;
+    gomp=1;
     stomp=0;
     cosamp=0;
-    cvx=0;
+    cvx=1;
     Lomp=1;
-    PLomp=0;
-    PLomp2=0;
-    Lgomp=0;
-    PLgomp=0;
+    PLomp=1;
+    PLomp2=1;
+    Lgomp=1;
+    PLgomp=1;
     % Save results in mat file if set to 1
     save_result=0;
     
