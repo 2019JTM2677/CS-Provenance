@@ -12,19 +12,23 @@ function [x] = OMP_modified (h,y,A,L)
     for j = 1 : h
         x_cap=[];
         ind=[];
-        
+        %fprintf("iter:%d",j)
         % Projection 
         if j==1
             [~ ,index] = maxk(abs(A' * y),L); %choose first L max elements
+            %[c,d]=sort(abs(A' * y))
         else
             for l=1:L^(j-1)
                 [~,ind(:,l)] = maxk(abs(A' * Residue(:,l,j-1)),L);
+                %[c,d]=sort(abs(A' * Residue(:,l,j-1)))
             end
             ind = reshape(ind,[L^j,1]);
             S = repelem(S,L,1);
             index = ind;
         end
         S (:,j) = index  ;  % Add the newly selected indices to support set
+   
+        %display(S);
         
         for l = 1:L^j
             %C = A(:,kk(l,:))'*A(:,kk(l,:));%C(:,:,l)'*C(:,:,l);
