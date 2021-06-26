@@ -6,17 +6,17 @@
     clear;
     
     % Input Values
-    n = 4;                      % No. of nodes
+    n = 7;                      % No. of nodes
     hop_len = [1 2 3 4 5 6 7 8]; 
-    h = hop_len(3);             % Required path length
+    h = hop_len(5);             % Required path length
     topology = 'complete';      % Or 'random'
-    pkt_path = [1 2 3 n];
+    pkt_path = [2 1 3 4 5 n];
     no_of_pkts = 10^4;          % No. of iterations
-    error_threshold = 100;      % Error Rate = error_threshold/no_of_pkts
+    error_threshold = 200;      % Error Rate = error_threshold/no_of_pkts
     % Six values for column size 'm' starting at 2h
     start = 2*h;
     no_of_val = 6;
-    inc = 3;  % Increment
+    inc = 4;  % Increment
     stop = min((no_of_val -1)*inc + start,(n-1)^2);%m<E
     m = [start:inc:stop];       % Column size values using AP
     N = min(min(m)/h,h) ;       % N for gOMP 
@@ -24,15 +24,18 @@
     
     % Run algorithm if value is set 1
     omp=1;
-    gomp=1;
+    pomp=1;
+    alpha=0.5; % For P-OMP
+    gomp=0;
     stomp=0;
     cosamp=0;
-    cvx=1;
-    Lomp=1;
-    PLomp=1;
-    PLomp2=1;
-    Lgomp=1;
-    PLgomp=1;
+    cvx=0;
+    Lomp=0;
+    PLomp=0;
+    PLomp2=0;
+    Lgomp=0;
+    PLgomp=0;
+    
     % Save results in mat file if set to 1
     save_result=0;
     
@@ -169,6 +172,7 @@
     
     error_rate = zeros(1,length(m));            % CVX
     error_rate_OMP = zeros(1,length(m));        % OMP
+    error_rate_pOMP = zeros(1,length(m));        % OMP
     error_rate_OMP_mod_v1=zeros(1,length(m));   % PL-OMP one missing link(in-built path constraints)
     error_rate_OMP_mod_v2 = zeros(1,length(m)); % L-OMP(path constraints after solution)
     error_rate_OMP_mod = zeros(1,length(m));    % L-OMP  with brute force
@@ -184,6 +188,7 @@
     for m_index =1: length(m)
         error_count = 0;    
         error_count_OMP = 0;  
+        error_count_pOMP = 0;  
         error_count_OMP_mod_v1 = 0;
         error_count_PLOMP2=0;
         error_count_OMP_mod_v2 = 0;
@@ -198,6 +203,7 @@
         
         error_rate(m_index) = 0;
         error_rate_OMP(m_index) = 0;
+        error_rate_pOMP(m_index) = 0;  
         error_rate_OMP_mod_v1(m_index) = 0;
         error_rate_OMP_mod_v2(m_index) = 0;
         error_rate_OMP_mod(m_index) = 0;
@@ -247,10 +253,28 @@
               
                 if ~isequal(x_OMP, Path_arr)
                    error_count_OMP = error_count_OMP +1; % Increment count
+                   flag_OMP=0;
+                else
+                    flag_OMP=1;
                 end
             end
 %-------------------------------------------------------------------------%
             
+
+%-------------------- Recovery using Path_aware_OMP ---------------------------------%
+            if pomp
+                x_pOMP = Path_aware_OMP (h,y,Ar,n,alpha);
+                x_pOMP(abs(x_pOMP)<=0.001)=0;
+                x_pOMP(abs(x_pOMP)>0.001)=1;
+                if ~isequal(x_pOMP, Path_arr)
+                   error_count_pOMP = error_count_pOMP +1; % Increment count
+                   if flag_OMP==1
+                       %fprintf("\nPOMP ERROR\n");
+                       %break
+                   end
+                end
+            end
+%-------------------------------------------------------------------------%
 %-------------------- Recovery using gOMP --------------------------------%
             if gomp
                 %N = 2;%floor(min(h,m(m_index)/h));
@@ -703,6 +727,7 @@
         
         error_rate(m_index) = error_count/pkt_count;
         error_rate_OMP(m_index) = error_count_OMP/pkt_count;
+        error_rate_pOMP(m_index) = error_count_pOMP/pkt_count;
         error_rate_OMP_mod_v1(m_index) = error_count_OMP_mod_v1/pkt_count;
         error_rate_PLOMP2(m_index)=  error_count_PLOMP2/pkt_count;
         error_rate_OMP_mod_v2(m_index) =  error_count_OMP_mod_v2/pkt_count;
@@ -717,10 +742,11 @@
         %}
         % DISPLAY Error rates
         %fprintf("Error Rate:%f for column size %d\n",error_rate(m_index),m(m_index));
-        %fprintf("Error Rate:%f for column size %d OMP\n",error_rate_OMP(m_index),m(m_index));
-        fprintf("Error Rate:%f for column size %d PL-OMP\n",error_rate_OMP_mod_v1(m_index),m(m_index));
-        fprintf("Error Rate:%f for column size %d PL-OMP 2\n",error_rate_PLOMP2(m_index),m(m_index));
-        fprintf("Error Rate:%f for column size %d L-OMP\n",error_rate_OMP_mod_v2(m_index),m(m_index));
+        fprintf("Error Rate:%f for column size %d OMP\n",error_rate_OMP(m_index),m(m_index));
+        fprintf("Error Rate:%f for column size %d P-OMP\n",error_rate_pOMP(m_index),m(m_index));
+        %fprintf("Error Rate:%f for column size %d PL-OMP\n",error_rate_OMP_mod_v1(m_index),m(m_index));
+        %fprintf("Error Rate:%f for column size %d PL-OMP 2\n",error_rate_PLOMP2(m_index),m(m_index));
+        %fprintf("Error Rate:%f for column size %d L-OMP\n",error_rate_OMP_mod_v2(m_index),m(m_index));
         %fprintf("Error Rate:%f for column size %d mod OMP \n",error_rate_OMP_mod(m_index),m(m_index));
         %fprintf("Error Rate:%f for column size %d OMP topo\n",error_rate_OMP_topo(m_index),m(m_index));
         %fprintf("Error Rate:%f for column size %d list wo path\n",list_wo_path_rate(m_index),m(m_index));
@@ -737,12 +763,27 @@
     
     
 %% PLOTS    
-    
-    %
+    fs = 16;
+    set(0,'defaultAxesFontName', 'Times New Roman')
+    set(0,'DefaultLineLineWidth',2)
+    set(0,'DefaultLineMarkerSize',10)
+    %set(0,'DefaultLineMarkerSize','default')
+    %set(0,'DefaultLineLineWidth','default')
+    set(0,'DefaultAxesFontSize',fs)
+    set(0,'DefaultAxesFontWeight','default')
+    set(gca,'FontSize',fs)
+    set(get(gca,'Xlabel'),'FontSize',fs)
+    set(get(gca,'Ylabel'),'FontSize',fs)
+    set(get(gca,'Title'),'FontSize',fs)
+    set(get(gca,'Xlabel'),'FontWeight','default')
+    set(get(gca,'Ylabel'),'FontWeight','default')
+    set(get(gca,'Title'),'FontWeight','default')  
+
     figure(2)
     semilogy(m,error_rate, 'yo-', 'LineWidth', 1.5);
     hold on
-    semilogy(m,error_rate_OMP, 'b+-', 'LineWidth', 1.5);
+    semilogy(m,error_rate_OMP, 'b+-');
+    semilogy(m,error_rate_pOMP, 'g*-');
     semilogy(m,error_rate_OMP_mod_v1, 'ms-', 'LineWidth', 1.5);
     semilogy(m,error_rate_OMP_mod_v2, 'gs-', 'LineWidth', 1.5);
     semilogy(m,error_rate_gOMP, 'k+-', 'LineWidth', 1.5);
@@ -750,13 +791,15 @@
     semilogy(m,error_rate_gOMP_mod_v2, 'rs-', 'LineWidth', 1.5);
     %semilogy(m,error_rate_stOMP, 'yo-', 'LineWidth', 2);
     %semilogy(m,error_rate_cosamp, 'ko-', 'LineWidth', 2);
-    axis([0 100 0 1]);
+    %}
+    %axis([0 100 0 1]);
     grid on
-    legend('CVX','OMP','PL-OMP','L-OMP','gOMP','PL-gOMP','L-gOMP');
-    title('Error rate vs column size SE');
-    xlabel('Column size, m');
+    legend('CVX','OMP','P-OMP','PL-OMP','L-OMP','gOMP','PL-gOMP','L-gOMP');
+    %legend('OMP','P-OMP 0.1','P-OMP 0.2','P-OMP 0.3','P-OMP 0.4','P-OMP 0.5','P-OMP 0.6','P-OMP 0.7','P-OMP 0.8','P-OMP 0.9','P-OMP 1');
+    title('Error rate vs column size NCEE');
+    xlabel('m');
     ylabel('Error rate')
-    hold off
+    
     %}
 %end
 
@@ -764,5 +807,5 @@ infos ={'Results for SEE:(I)CVX (II)1. OMP 2. PL-OMP 3. L-OMP (III)1. gOMP 2.PL-
    'n= no. of nodes';'h = path hop length/sparsity';'E= no. of possible edges';
    'm = column size of Ar for OMP';'graph_adj_mat = topology adjacency matrix'};
 if save_result
-   save SEE_n9_h8_fix.mat infos n E h graph_adj_mat path m error_rate error_rate_OMP error_rate_OMP_mod_v1 error_rate_OMP_mod_v2 error_rate_gOMP error_rate_gOMP_mod_v1 error_rate_gOMP_mod_v2 bad_fraction_overall OMP_t_module1 OMP_t_module2 gOMP_t_module1 gOMP_t_module2 cvx_t_module
+   save SEE_n9_h8_fix.mat infos n E h alpha graph_adj_mat path m error_rate error_rate_OMP error_rate_OMP_mod_v1 error_rate_OMP_mod_v2 error_rate_gOMP error_rate_gOMP_mod_v1 error_rate_gOMP_mod_v2 bad_fraction_overall OMP_t_module1 OMP_t_module2 gOMP_t_module1 gOMP_t_module2 cvx_t_module
 end
