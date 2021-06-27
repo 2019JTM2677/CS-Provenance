@@ -14,13 +14,15 @@ for J = 1 : K
     if J==1
         [~ ,index] = max(abs(A' * y)) ;
     else
+        %if J<=K/2
         %[~,index] = max(abs(A' * Residue(:,J-1)));
-       
-        if J==2
-            g11 = []; g12=[];g31=[];g32=[];
-            edges=[];reverse_group=[];
-        end
-        [index,g11,g12,g31,g32,reverse_group,edges] = max_index(A,Residue(:,J-1),g11,g12,g31,g32,reverse_group,edges,kk(J-1),n,alpha);
+        %else
+            if J==2 % K/2+1
+                g11 = []; g12=[];g31=[];g32=[];
+                edges=[];reverse_group=[];
+            end
+            [index,g11,g12,g31,g32,reverse_group,edges] = max_index(A,Residue(:,J-1),g11,g12,g31,g32,reverse_group,edges,kk(J-1),n,alpha);
+        %end
         %fprintf("Final: ");display(edges);
         %}
     end
