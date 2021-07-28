@@ -141,7 +141,17 @@
         j=g+(0:n-1)*n+(n^2*(k-1));
         A_2(i,j)=1;
     end
-            
+    % Correction in thesis Pg13 section 3.2   
+    %{
+    e=ones(1,n);
+    temp1=eye(n);
+    temp2=kron(e,temp1);
+    p=reshape(1:n^2,n,[]).';
+    A_2=kron(temp1,temp2);
+    A_2=A_2(p,:)
+     
+    %}
+       
     % Define n nodes
     nodes_de=[];  % All varE used for additional constraint
     for i= 1:n
